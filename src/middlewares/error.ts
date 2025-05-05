@@ -20,9 +20,10 @@ export const errorHandler = (
   req: Request,
   res: Response,
   next: NextFunction
-): Response => {
+): void => {
   if (err instanceof AppError) {
-    return errorResponse(res, err.message, err.statusCode);
+    errorResponse(res, err.message, err.statusCode);
+    return;
   }
 
   // Log unexpected errors
@@ -33,10 +34,11 @@ export const errorHandler = (
     method: req.method,
   });
 
-  return errorResponse(
+  errorResponse(
     res,
     "Internal server error",
     500,
     process.env.NODE_ENV === "development" ? err : undefined
   );
+  return;
 };

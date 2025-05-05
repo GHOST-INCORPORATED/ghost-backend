@@ -1,7 +1,5 @@
 // src/controllers/webhook.controller.ts
 import { Request, Response, NextFunction } from "express";
-import crypto from "crypto";
-import { PAYSTACK_WEBHOOK_SECRET } from "../config/paystack";
 import { verifyPaystackSignature } from "../utils/crypto";
 import { paymentService, escrowService, transferService } from "../services";
 import logger from "../utils/logger";
@@ -25,7 +23,8 @@ export class WebhookController {
 
       if (!signature || !verifyPaystackSignature(signature, req.body)) {
         logger.warn("Invalid Paystack webhook signature");
-        return res.status(403).send("Invalid signature");
+        res.status(403).send("Invalid signature");
+        return;
       }
 
       const event: PaystackWebhookEvent = req.body;
@@ -46,10 +45,12 @@ export class WebhookController {
       }
 
       // Return 200 for any event to acknowledge receipt
-      return res.status(200).send("Webhook processed");
+      res.status(200).send("Webhook processed");
+      return;
     } catch (error) {
       logger.error("Webhook processing error:", { error });
-      return res.status(500).send("Internal Server Error");
+      res.status(500).send("Internal Server Error");
+      return;
     }
   }
 

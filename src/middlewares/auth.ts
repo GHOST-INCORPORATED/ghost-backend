@@ -12,12 +12,13 @@ export const authenticate = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-): Promise<void | Response> => {
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return errorResponse(res, "Unauthorized: No token provided", 401);
+      errorResponse(res, "Unauthorized: No token provided", 401);
+      return;
     }
 
     const token = authHeader.split("Bearer ")[1];
@@ -29,7 +30,8 @@ export const authenticate = async (
       next();
     } catch (error) {
       logger.error("Authentication error:", { error });
-      return errorResponse(res, "Unauthorized: Invalid token", 401);
+      errorResponse(res, "Unauthorized: Invalid token", 401);
+      return;
     }
   } catch (error) {
     next(error);

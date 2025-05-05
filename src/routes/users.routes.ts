@@ -20,7 +20,7 @@ router.post(
     body("bankCode").notEmpty().withMessage("Bank code is required"),
     body("fullName").notEmpty().withMessage("Full name is required"),
   ]),
-  userController.setBankDetails.bind(userController)
+  userController.setBankDetails
 );
 
 export default router;

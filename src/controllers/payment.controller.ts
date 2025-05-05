@@ -1,10 +1,8 @@
 // src/controllers/payment.controller.ts
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import { AuthenticatedRequest } from "../middlewares/auth";
 import { escrowService, paymentService } from "../services";
 import { successResponse, errorResponse } from "../utils/response";
-import logger from "../utils/logger";
-import { AppError } from "../middlewares/error";
 import { EscrowStatus, PaymentStatus } from "../types";
 
 export class PaymentController {
@@ -24,21 +22,24 @@ export class PaymentController {
       const escrow = await escrowService.getEscrowById(escrowId);
 
       if (!escrow) {
-        return errorResponse(res, "Escrow not found", 404);
+        errorResponse(res, "Escrow not found", 404);
+        return;
       }
 
       // Check if user is the buyer
       if (escrow.buyerId !== userId) {
-        return errorResponse(res, "Only the buyer can make payment", 403);
+        errorResponse(res, "Only the buyer can make payment", 403);
+        return;
       }
 
       // Check if escrow is in the right state
       if (escrow.status !== EscrowStatus.AWAITING_PAYMENT) {
-        return errorResponse(
+        errorResponse(
           res,
           `Cannot make payment for escrow in '${escrow.status}' status`,
           400
         );
+        return;
       }
 
       // Create payment record
@@ -53,7 +54,7 @@ export class PaymentController {
       // In a real implementation, you would initialize Paystack payment here
       // and return the authorization URL to the client
 
-      return successResponse(
+      successResponse(
         res,
         {
           paymentId: payment.id,
@@ -63,6 +64,7 @@ export class PaymentController {
         },
         "Payment initialized successfully"
       );
+      return;
     } catch (error) {
       next(error);
     }
@@ -85,7 +87,8 @@ export class PaymentController {
       );
 
       if (verifiedPayment.status !== "success") {
-        return errorResponse(res, "Payment verification failed", 400);
+        errorResponse(res, "Payment verification failed", 400);
+        return;
       }
 
       // Update payment record
@@ -98,7 +101,8 @@ export class PaymentController {
       const payment = await paymentService.getPaymentByReference(reference);
 
       if (!payment) {
-        return errorResponse(res, "Payment record not found", 404);
+        errorResponse(res, "Payment record not found", 404);
+        return;
       }
 
       // Update escrow status
@@ -110,7 +114,7 @@ export class PaymentController {
         }
       );
 
-      return successResponse(
+      successResponse(
         res,
         {
           reference,
@@ -118,6 +122,7 @@ export class PaymentController {
         },
         "Payment verified successfully"
       );
+      return;
     } catch (error) {
       next(error);
     }

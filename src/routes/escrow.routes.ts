@@ -27,34 +27,30 @@ const validateEscrowId = [
 router.use(authenticate);
 
 // Create a new escrow
-router.post(
-  "/",
-  validate(validateCreateEscrow),
-  escrowController.createEscrow.bind(escrowController)
-);
+router.post("/", validate(validateCreateEscrow), escrowController.createEscrow);
 
 // Get all escrows for current user
-router.get("/", escrowController.getAllEscrows.bind(escrowController));
+router.get("/", escrowController.getAllEscrows);
 
 // Get specific escrow by ID
 router.get(
   "/:escrowId",
   validate(validateEscrowId),
-  escrowController.getEscrow.bind(escrowController)
+  escrowController.getEscrow
 );
 
 // Confirm escrow completion (buyer)
 router.post(
   "/:escrowId/confirm",
   validate(validateEscrowId),
-  escrowController.confirmEscrow.bind(escrowController)
+  escrowController.confirmEscrow
 );
 
 // Process withdrawal (seller)
 router.post(
   "/withdraw",
   body("escrowId").notEmpty().withMessage("Escrow ID is required"),
-  escrowController.processWithdrawal.bind(escrowController)
+  escrowController.processWithdrawal
 );
 
 export default router;

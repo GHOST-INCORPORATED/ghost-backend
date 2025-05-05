@@ -1,17 +1,14 @@
 // src/controllers/escrow.controller.ts
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import { AuthenticatedRequest } from "../middlewares/auth";
 import { escrowService, transferService } from "../services";
 import { successResponse, errorResponse } from "../utils/response";
-import logger from "../utils/logger";
-import { AppError } from "../middlewares/error";
 import {
   CreateEscrowRequest,
   EscrowStatus,
   ProcessWithdrawalRequest,
 } from "../types";
 import { db } from "../config/firebase";
-import { generateRandomId } from "../utils/crypto";
 
 export class EscrowController {
   /**
@@ -34,7 +31,8 @@ export class EscrowController {
 
       const escrow = await escrowService.createEscrow(buyerId, escrowData);
 
-      return successResponse(res, escrow, "Escrow created successfully", 201);
+      successResponse(res, escrow, "Escrow created successfully", 201);
+      return;
     } catch (error) {
       next(error);
     }
@@ -55,15 +53,18 @@ export class EscrowController {
       const escrow = await escrowService.getEscrowById(escrowId);
 
       if (!escrow) {
-        return errorResponse(res, "Escrow not found", 404);
+        errorResponse(res, "Escrow not found", 404);
+        return;
       }
 
       // Check if user is authorized to view this escrow
       if (escrow.buyerId !== userId && escrow.sellerId !== userId) {
-        return errorResponse(res, "Unauthorized to view this escrow", 403);
+        errorResponse(res, "Unauthorized to view this escrow", 403);
+        return;
       }
 
-      return successResponse(res, escrow, "Escrow fetched successfully");
+      successResponse(res, escrow, "Escrow fetched successfully");
+      return;
     } catch (error) {
       next(error);
     }
@@ -93,7 +94,8 @@ export class EscrowController {
         escrows = [...buyerEscrows, ...sellerEscrows];
       }
 
-      return successResponse(res, escrows, "Escrows fetched successfully");
+      successResponse(res, escrows, "Escrows fetched successfully");
+      return;
     } catch (error) {
       next(error);
     }
@@ -114,25 +116,24 @@ export class EscrowController {
       const escrow = await escrowService.getEscrowById(escrowId);
 
       if (!escrow) {
-        return errorResponse(res, "Escrow not found", 404);
+        errorResponse(res, "Escrow not found", 404);
+        return;
       }
 
       // Check if user is the buyer
       if (escrow.buyerId !== userId) {
-        return errorResponse(
-          res,
-          "Only the buyer can confirm this escrow",
-          403
-        );
+        errorResponse(res, "Only the buyer can confirm this escrow", 403);
+        return;
       }
 
       // Check if escrow is in the right state
       if (escrow.status !== EscrowStatus.AWAITING_FEEDBACK) {
-        return errorResponse(
+        errorResponse(
           res,
           `Cannot confirm escrow in '${escrow.status}' status`,
           400
         );
+        return;
       }
 
       // Update escrow status
@@ -141,11 +142,8 @@ export class EscrowController {
         EscrowStatus.BUYER_CONFIRMED
       );
 
-      return successResponse(
-        res,
-        { escrowId },
-        "Escrow confirmed successfully"
-      );
+      successResponse(res, { escrowId }, "Escrow confirmed successfully");
+      return;
     } catch (error) {
       next(error);
     }
@@ -167,37 +165,43 @@ export class EscrowController {
       const escrow = await escrowService.getEscrowById(escrowId);
 
       if (!escrow) {
-        return errorResponse(res, "Escrow not found", 404);
+        errorResponse(res, "Escrow not found", 404);
+        return;
       }
 
       // Check if user is the seller
       if (escrow.sellerId !== userId) {
-        return errorResponse(res, "Only the seller can withdraw funds", 403);
+        errorResponse(res, "Only the seller can withdraw funds", 403);
+        return;
       }
 
       // Check if escrow is in the right state
       if (escrow.status !== EscrowStatus.BUYER_CONFIRMED) {
-        return errorResponse(
+        errorResponse(
           res,
           `Cannot withdraw from escrow in '${escrow.status}' status`,
           400
         );
+        return;
       }
 
       // Check if already withdrawn
       if (escrow.sellerWithdrawn) {
-        return errorResponse(res, "Funds already withdrawn", 400);
+        errorResponse(res, "Funds already withdrawn", 400);
+        return;
       }
 
       // Get seller's recipient code
       const sellerDoc = await db.collection("users").doc(userId).get();
       if (!sellerDoc.exists) {
-        return errorResponse(res, "Seller profile not found", 404);
+        errorResponse(res, "Seller profile not found", 404);
+        return;
       }
 
       const sellerData = sellerDoc.data();
       if (!sellerData?.paystackRecipientCode) {
-        return errorResponse(res, "Seller bank details not set", 400);
+        errorResponse(res, "Seller bank details not set", 400);
+        return;
       }
 
       // Create withdrawal record
@@ -228,7 +232,7 @@ export class EscrowController {
         );
       }
 
-      return successResponse(
+      successResponse(
         res,
         {
           withdrawalId: withdrawal.id,
@@ -237,6 +241,7 @@ export class EscrowController {
         },
         "Withdrawal processed successfully"
       );
+      return;
     } catch (error) {
       next(error);
     }

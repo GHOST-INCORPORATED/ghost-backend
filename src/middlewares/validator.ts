@@ -10,10 +10,12 @@ export const validate = (validations: ValidationChain[]) => {
     // Check for validation errors
     const errors = validationResult(req);
     if (errors.isEmpty()) {
-      return next();
+      next();
+      return;
     }
 
     // Return validation errors
-    return errorResponse(res, "Validation error", 400, errors.array());
+    errorResponse(res, "Validation error", 400, errors.array());
+    return;
   };
 };

@@ -1,8 +1,8 @@
 // src/controllers/user.controller.ts
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import { AuthenticatedRequest } from "../middlewares/auth";
 import { transferService } from "../services";
-import { successResponse, errorResponse } from "../utils/response";
+import { successResponse } from "../utils/response";
 import { BankDetailsRequest } from "../types";
 
 export class UserController {
@@ -35,11 +35,12 @@ export class UserController {
         paystackRecipientCode: recipientCode,
       });
 
-      return successResponse(
+      successResponse(
         res,
         { recipientCode },
         "Bank details saved successfully"
       );
+      return;
     } catch (error) {
       next(error);
     }

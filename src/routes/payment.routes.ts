@@ -14,7 +14,7 @@ router.use(authenticate);
 router.post(
   "/:escrowId/initialize",
   validate([param("escrowId").notEmpty().withMessage("Escrow ID is required")]),
-  paymentController.initializePayment.bind(paymentController)
+  paymentController.initializePayment
 );
 
 // Verify payment status
@@ -23,7 +23,7 @@ router.get(
   validate([
     param("reference").notEmpty().withMessage("Reference is required"),
   ]),
-  paymentController.verifyPayment.bind(paymentController)
+  paymentController.verifyPayment
 );
 
 export default router;

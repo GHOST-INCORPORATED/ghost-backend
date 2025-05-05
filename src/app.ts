@@ -4,7 +4,6 @@ import cors from "cors";
 import compression from "compression";
 import { errorHandler } from "./middlewares/error";
 import routes from "./routes";
-import logger from "./utils/logger";
 import { logRequest } from "./middlewares/logger";
 
 const app = express();

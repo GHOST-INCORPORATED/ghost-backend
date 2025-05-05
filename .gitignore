@@ -1,3 +1,6 @@
 node_modules
 .env
 dist
+/*.log
+combined.log
+error.log

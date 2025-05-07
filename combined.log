@@ -300,3 +300,20 @@
 2025-05-07T11:14:04.077Z [[31merror[39m]: Process withdrawal error: {"error":"Request failed with status code 400","withdrawalId":"pql94AhU7s"}
 2025-05-07T11:14:04.081Z [[33mwarn[39m]: POST /api/escrows/withdraw - 500 - 6744ms 
 2025-05-07T18:58:33.166Z [[32minfo[39m]: Server running on port 3000 
+2025-05-07T19:00:03.372Z [[32minfo[39m]: Server running on port 3000 
+2025-05-07T19:05:22.400Z [[32minfo[39m]: POST /api/escrows/withdraw - Request received 
+2025-05-07T19:05:26.470Z [[32minfo[39m]: POST /api/escrows/withdraw - Request received 
+2025-05-07T19:05:30.516Z [[32minfo[39m]: Request data {"transferRequest":{"source":"balance","amount":3000000,"recipient":"RCP_26kb0e586m9gdx9","reason":"Payment for escrow T645946178362597","reference":"transfer_FbcbaK6gESxJRK9vNcY6nc5xQKpvYdoCJ1bZk7CFLAq4KP4gmt8vyJEUrG7zftrSXfG8CYxUzjquPVxhPfgMO0BIaAO6oLi3nzwR"}}
+2025-05-07T19:05:30.517Z [[32minfo[39m]: Starting Paystack withdrawal request 
+2025-05-07T19:05:30.579Z [[32minfo[39m]: Request data {"transferRequest":{"source":"balance","amount":3000000,"recipient":"RCP_26kb0e586m9gdx9","reason":"Payment for escrow T211775862034871","reference":"transfer_k83Zkgq0ukUMavgYFUH57VD1s7Y3B7ueEQPTjzIz4khqJMyzE5CQyYn29uL2bnHnMOc9KVvlKNZozTQam2P3mpc5w62YVfvvurlM"}}
+2025-05-07T19:05:30.579Z [[32minfo[39m]: Starting Paystack withdrawal request 
+2025-05-07T19:05:31.934Z [[31merror[39m]: Process withdrawal error: {"error":"Request failed with status code 400","withdrawalId":"73tA3JPqJe"}
+2025-05-07T19:05:31.944Z [[33mwarn[39m]: POST /api/escrows/withdraw - 500 - 5474ms 
+2025-05-07T19:05:31.946Z [[31merror[39m]: Process withdrawal error: {"error":"Request failed with status code 400","withdrawalId":"xcG7RjtgWg"}
+2025-05-07T19:05:31.957Z [[33mwarn[39m]: POST /api/escrows/withdraw - 500 - 9557ms 
+2025-05-07T19:47:37.228Z [[32minfo[39m]: POST /api/users/bank-details - Request received 
+2025-05-07T19:47:37.238Z [[32minfo[39m]: sending with paystack request 
+2025-05-07T19:47:38.187Z [[32minfo[39m]: Done with paystack request Transfer recipient created successfully {"status":true,"data":{"active":true,"createdAt":"2025-05-07T10:31:29.000Z","currency":"NGN","description":null,"domain":"test","email":null,"id":103296566,"integration":1393071,"metadata":null,"name":"nnaemeka","recipient_code":"RCP_26kb0e586m9gdx9","type":"nuban","updatedAt":"2025-05-07T19:47:38.000Z","is_deleted":false,"isDeleted":false,"details":{"authorization_code":null,"account_number":"8157959120","account_name":"NNAEMEKA SIMON-PETER OBI","bank_code":"999992","bank_name":"OPay Digital Services Limited (OPay)"}}}
+2025-05-07T19:47:39.621Z [[32minfo[39m]: POST /api/users/bank-details - 200 - 2394ms 
+2025-05-07T20:07:34.296Z [[32minfo[39m]: GET / - Request received 
+2025-05-07T20:07:34.343Z [[33mwarn[39m]: GET / - 404 - 49ms 

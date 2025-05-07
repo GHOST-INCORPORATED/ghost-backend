@@ -13,41 +13,53 @@ import {
 } from "../types";
 
 export class WebhookController {
+  constructor() {
+    // make sure all methods stay bound to this instance
+    this.handlePaystackWebhook = this.handlePaystackWebhook.bind(this);
+  }
   /**
    * Handle Paystack webhook events
    */
   async handlePaystackWebhook(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log("[Webhook] Received Paystack webhook");
       // Verify signature
       const signature = req.headers["x-paystack-signature"] as string;
+      console.log("[Webhook] Signature header:", signature);
 
       if (!signature || !verifyPaystackSignature(signature, req.body)) {
+        console.log("[Webhook] Invalid or missing signature");
         logger.warn("Invalid Paystack webhook signature");
         res.status(403).send("Invalid signature");
         return;
       }
 
       const event: PaystackWebhookEvent = req.body;
+      console.log("[Webhook] Event payload:", JSON.stringify(event));
 
       // Handle charge events (payments)
       if (event.event === "charge.success") {
+        console.log("[Webhook] Handling charge.success event");
         await this.handleChargeSuccess(event as PaystackChargeEvent);
       }
 
       // Handle transfer events (withdrawals)
       else if (event.event === "transfer.success") {
+        console.log("[Webhook] Handling transfer.success event");
         await this.handleTransferSuccess(event as PaystackTransferEvent);
       }
 
       // Handle transfer failure
       else if (event.event === "transfer.failed") {
+        console.log("[Webhook] Handling transfer.failed event");
         await this.handleTransferFailed(event as PaystackTransferEvent);
       }
 
-      // Return 200 for any event to acknowledge receipt
+      console.log("[Webhook] Successfully processed event:", event.event);
       res.status(200).send("Webhook processed");
       return;
     } catch (error) {
+      console.log("[Webhook] Processing error:", error);
       logger.error("Webhook processing error:", { error });
       res.status(500).send("Internal Server Error");
       return;
@@ -62,31 +74,17 @@ export class WebhookController {
     const reference = paymentData.reference;
 
     try {
-      // Verify payment again
-      const verifiedPayment = await paymentService.verifyPaystackPayment(
-        reference
-      );
-
-      if (verifiedPayment.status !== "success") {
-        throw new Error("Payment verification failed");
-      }
-
+      logger.info("Updating Payment record");
       // Update payment status
       await paymentService.updatePaymentStatus(
         reference,
         PaymentStatus.SUCCESS
       );
 
-      // Get payment record to find escrow
-      const payment = await paymentService.getPaymentByReference(reference);
-
-      if (!payment) {
-        throw new Error("Payment record not found");
-      }
-
+      logger.info("Updating Escrow record");
       // Update escrow status
       await escrowService.updateEscrowStatus(
-        payment.escrowId,
+        reference,
         EscrowStatus.AWAITING_FEEDBACK,
         {
           paymentVerified: true,

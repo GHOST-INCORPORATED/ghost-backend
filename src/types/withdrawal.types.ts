@@ -23,4 +23,5 @@ export enum WithdrawalStatus {
 export interface ProcessWithdrawalRequest {
   escrowId: string;
   withdrawalId: string;
+  userId: string;
 }

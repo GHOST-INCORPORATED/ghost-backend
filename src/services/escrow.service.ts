@@ -69,12 +69,12 @@ export class EscrowService {
    * @param additionalData Additional data to update
    */
   async updateEscrowStatus(
-    escrowId: string,
+    reference: string,
     status: EscrowStatus,
     additionalData: Partial<EscrowRecord> = {}
   ): Promise<void> {
     try {
-      const escrowRef = db.collection("escrows").doc(escrowId);
+      const escrowRef = db.collection("escrows").doc(reference);
       const escrowDoc = await escrowRef.get();
 
       if (!escrowDoc.exists) {
@@ -89,7 +89,7 @@ export class EscrowService {
     } catch (error: any) {
       logger.error("Update escrow status error:", {
         error: error.message,
-        escrowId,
+        reference,
       });
       if (error instanceof AppError) {
         throw error;

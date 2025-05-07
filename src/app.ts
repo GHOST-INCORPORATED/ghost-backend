@@ -2,11 +2,17 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
+import swaggerUi from "swagger-ui-express";
+import swaggerJSDoc from "swagger-jsdoc";
+import { swaggerOptions } from "./config/swagger";
 import { errorHandler } from "./middlewares/error";
 import routes from "./routes";
 import { logRequest } from "./middlewares/logger";
 
 const app = express();
+
+const swaggerSpec = swaggerJSDoc(swaggerOptions);
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Middleware
 app.use(helmet()); // Security headers

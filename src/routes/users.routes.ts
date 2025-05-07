@@ -8,7 +8,7 @@ import { body } from "express-validator";
 const router = Router();
 
 // All routes require authentication
-router.use(authenticate);
+// router.use(authenticate);
 
 // Set bank details
 router.post(

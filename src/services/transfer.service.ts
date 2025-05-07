@@ -30,6 +30,7 @@ export class TransferService {
         currency: "NGN",
       };
 
+      logger.info("sending with paystack request");
       const response = await axios.post<PaystackRecipientResponse>(
         `${PAYSTACK_API_URL}/transferrecipient`,
         recipientData,
@@ -40,6 +41,7 @@ export class TransferService {
           },
         }
       );
+      logger.info("Done with paystack request", response.data);
 
       if (!response.data.status) {
         throw new AppError("Failed to create transfer recipient", 400);
@@ -50,6 +52,7 @@ export class TransferService {
       logger.error("Create Paystack recipient error:", {
         error: error.message,
       });
+
       if (error instanceof AppError) {
         throw error;
       }
@@ -97,7 +100,7 @@ export class TransferService {
   ): Promise<WithdrawalRecord> {
     try {
       const withdrawalId = generateRandomId();
-      const transferRef = `transfer_${generateRandomId(15)}`;
+      const transferRef = `transfer_${generateRandomId(100)}`;
       const now = new Date();
 
       // Create withdrawal record
@@ -153,7 +156,10 @@ export class TransferService {
         reference: withdrawalDoc.data()?.transferReference,
       };
 
+      logger.info("Request data", { transferRequest });
+
       // Initiate transfer with Paystack
+      logger.info("Starting Paystack withdrawal request");
       const response = await axios.post<PaystackTransferResponse>(
         `${PAYSTACK_API_URL}/transfer`,
         transferRequest,
@@ -164,6 +170,9 @@ export class TransferService {
           },
         }
       );
+      logger.info("Done with Paystack withdrawal request", {
+        response: response.data,
+      });
 
       if (!response.data.status) {
         throw new AppError("Transfer initiation failed", 400);
@@ -172,6 +181,7 @@ export class TransferService {
       const transferData = response.data.data;
 
       // Update withdrawal record
+      logger.info("Updating Withdrawal records");
       await withdrawalRef.update({
         status:
           transferData.status === "success"
@@ -190,6 +200,9 @@ export class TransferService {
         error: error.message,
         withdrawalId,
       });
+
+      console.log({ error }, "The error");
+
       if (error instanceof AppError) {
         throw error;
       }

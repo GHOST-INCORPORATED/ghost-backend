@@ -15,9 +15,9 @@ export class UserController {
     next: NextFunction
   ) {
     try {
-      const userId = req.userId as string;
-      const { bankAccountNumber, bankCode, fullName } =
-        req.body as BankDetailsRequest;
+      const { bankAccountNumber, bankCode, fullName, userId } = req.body;
+
+      console.table({ bankAccountNumber, bankCode, fullName });
 
       // Create recipient on Paystack
       const recipientCode = await transferService.createPaystackRecipient({
@@ -26,6 +26,8 @@ export class UserController {
         fullName,
         paystackRecipientCode: "", // Will be populated after creation
       });
+
+      console.log({ recipientCode });
 
       // Save bank details to user profile
       await transferService.saveBankDetails(userId, {
@@ -42,6 +44,8 @@ export class UserController {
       );
       return;
     } catch (error) {
+      console.log({ error });
+
       next(error);
     }
   }

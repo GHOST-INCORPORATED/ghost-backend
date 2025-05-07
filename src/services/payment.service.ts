@@ -80,22 +80,22 @@ export class PaymentService {
   ): Promise<void> {
     try {
       const paymentsRef = db.collection("payments");
-      const querySnapshot = await paymentsRef
-        .where("reference", "==", reference)
-        .limit(1)
-        .get();
+      // Fetch by document ID instead of querying
+      const docSnap = await paymentsRef.doc(reference).get();
 
-      if (querySnapshot.empty) {
+      // Make sure it exists
+      if (!docSnap.exists) {
         throw new AppError("Payment not found", 404);
       }
 
-      const paymentDoc = querySnapshot.docs[0];
+      // Prepare your update
       const updateData: Partial<PaymentRecord> = {
         status,
         paidAt: status === PaymentStatus.SUCCESS ? (new Date() as any) : null,
       };
 
-      await paymentDoc.ref.update(updateData);
+      // Apply the update
+      await docSnap.ref.update(updateData);
     } catch (error: any) {
       logger.error("Update payment status error:", {
         error: error.message,

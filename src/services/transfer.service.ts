@@ -99,13 +99,12 @@ export class TransferService {
     recipientCode: string
   ): Promise<WithdrawalRecord> {
     try {
-      const withdrawalId = generateRandomId();
-      const transferRef = `transfer_${generateRandomId(100)}`;
+      const transferRef = `transfer_${generateRandomId(20)}`;
       const now = new Date();
 
       // Create withdrawal record
       const withdrawal: WithdrawalRecord = {
-        id: withdrawalId,
+        id: transferRef,
         escrowId,
         userId,
         amount,
@@ -115,7 +114,7 @@ export class TransferService {
         processedAt: null,
       };
 
-      await db.collection("withdrawals").doc(withdrawalId).set(withdrawal);
+      await db.collection("withdrawals").doc(transferRef).set(withdrawal);
       return withdrawal;
     } catch (error: any) {
       logger.error("Initiate withdrawal error:", {
@@ -220,8 +219,11 @@ export class TransferService {
     transferRef: string,
     status: WithdrawalStatus,
     notes?: string
-  ): Promise<void> {
+  ): Promise<{ escrowId: string }> {
     try {
+      logger.info("Updating withdrawal status", {
+        transferRef,
+      });
       const withdrawalsRef = db.collection("withdrawals");
       const querySnapshot = await withdrawalsRef
         .where("transferReference", "==", transferRef)
@@ -241,8 +243,8 @@ export class TransferService {
       if (notes) {
         updateData.notes = notes;
       }
-
-      await withdrawalDoc.ref.update(updateData);
+      logger.info("Updated withdrawal status");
+      return { escrowId: withdrawalDoc.data()?.escrowId };
     } catch (error: any) {
       logger.error("Update withdrawal status error:", {
         error: error.message,
@@ -252,6 +254,47 @@ export class TransferService {
         throw error;
       }
       throw new AppError("Failed to update withdrawal status", 500);
+    }
+  }
+
+  /**
+   * Approve a pending transfer using Paystack API
+   * @param transferCode The transfer code to approve
+   */
+  async approveTransfer(transferCode: string): Promise<void> {
+    try {
+      const response = await axios.post(
+        `${PAYSTACK_API_URL}/transfer/finalize_transfer`,
+        {
+          transfer_code: transferCode,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.data.status) {
+        throw new AppError("Failed to approve transfer", 400);
+      }
+
+      logger.info("Transfer approved successfully", {
+        transferCode,
+        response: response.data,
+      });
+    } catch (error: any) {
+      logger.error("Approve transfer error:", {
+        error: error.message,
+        transferCode,
+      });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError("Failed to approve transfer", 500);
     }
   }
 }

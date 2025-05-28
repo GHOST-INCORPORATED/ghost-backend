@@ -41,7 +41,6 @@ export interface PaystackChargeEvent {
     };
   };
 }
-
 export interface PaystackTransferEvent {
   event: string;
   data: {
@@ -86,6 +85,51 @@ export interface PaystackTransferEvent {
 }
 
 export type PaystackWebhookEvent = PaystackChargeEvent | PaystackTransferEvent;
+
+export interface TransferRecipient {
+  id: number;
+  integration: number;
+  domain: string;
+  type: string;
+  currency: string;
+  name: string;
+  details: {
+    account_number: string;
+    account_name: string;
+    bank_code: string;
+    bank_name: string;
+  };
+  description: string | null;
+  metadata: any | null;
+  recipientCode: string;
+  active: boolean;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  email: string | null;
+  recipientAccount: string;
+  institutionCode: string;
+}
+
+export interface TransferData {
+  amount: number;
+  createdAt: string;
+  currency: string;
+  domain: string;
+  failures: null | { reason: string };
+  id: number;
+  integration: number;
+  reason: string;
+  reference: string;
+  source: string;
+  source_details: any | null;
+  status: string;
+  titan_code: string | null;
+  transfer_code: string;
+  transferred_at: string | null;
+  updatedAt: string;
+  recipient: TransferRecipient;
+}
 
 export interface PaystackVerifyResponse {
   status: boolean;

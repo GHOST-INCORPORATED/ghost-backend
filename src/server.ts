@@ -10,52 +10,40 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Determine the mode based on environment variables
-const IS_FULL_SIMULATION = process.env.POSTMARK_FULL_SIMULATION === "true";
-const IS_POSTMARK_TEST_MODE =
-  process.env.POSTMARK_TEST_MODE === "true" || process.env.NODE_ENV === "test";
-const IS_LIVE_MODE = !IS_FULL_SIMULATION && !IS_POSTMARK_TEST_MODE;
-
-// Postmark tokens
 const POSTMARK_LIVE_TOKEN = process.env.POSTMARK_SERVER_TOKEN;
-const POSTMARK_TEST_TOKEN = "POSTMARK_API_TEST"; // Postmark's official test token
 
-// Determine which mode we're running in
-let currentMode: "SIMULATION" | "TEST" | "LIVE";
-let client: ServerClient | null = null;
-
-if (IS_FULL_SIMULATION) {
-  currentMode = "SIMULATION";
-  console.log("🧪 Running in FULL SIMULATION mode - all emails will be mocked");
-  console.log("📧 No actual Postmark API calls will be made");
-} else if (IS_POSTMARK_TEST_MODE) {
-  currentMode = "TEST";
-  console.log(
-    "🧪 Running in POSTMARK TEST mode - real emails with test headers"
+if (!POSTMARK_LIVE_TOKEN) {
+  console.error("❌ POSTMARK_SERVER_TOKEN is required for live mode");
+  console.error(
+    "💡 Make sure your .env file contains: POSTMARK_SERVER_TOKEN=your_live_token"
   );
-  console.log("📧 Using Postmark test server token");
-  try {
-    client = new ServerClient(POSTMARK_TEST_TOKEN);
-    console.log("✅ Postmark TEST client initialized successfully");
-  } catch (error) {
-    console.error("❌ Failed to initialize Postmark TEST client:", error);
-    process.exit(1);
-  }
-} else {
-  currentMode = "LIVE";
-  console.log("🚀 Running in POSTMARK LIVE mode - real emails will be sent");
-  if (!POSTMARK_LIVE_TOKEN) {
-    console.error("❌ POSTMARK_SERVER_TOKEN is required for live mode");
-    process.exit(1);
-  }
-  try {
-    client = new ServerClient(POSTMARK_LIVE_TOKEN);
-    console.log("✅ Postmark LIVE client initialized successfully");
-  } catch (error) {
-    console.error("❌ Failed to initialize Postmark LIVE client:", error);
-    process.exit(1);
-  }
+  process.exit(1);
 }
+
+const client = new ServerClient(POSTMARK_LIVE_TOKEN);
+console.log("✅ Postmark LIVE client initialized successfully");
+
+type EmailType = "finance" | "updates" | "support" | "noreply";
+
+const EMAIL_CONFIG = {
+  supportEmail: "support@ghostplay.store",
+  financeEmail: "finance@ghostplay.store",
+  updatesEmail: "updates@ghostplay.store",
+  noreplyEmail: "noreply@ghostplay.store",
+
+  getFromEmail: (emailType?: EmailType): string => {
+    switch (emailType) {
+      case "finance":
+        return "finance@ghostplay.store";
+      case "updates":
+        return "updates@ghostplay.store";
+      case "noreply":
+      case "support":
+      default:
+        return "support@ghostplay.store"; // Support handles noreply functions
+    }
+  },
+};
 
 interface EmailRequest {
   from?: string;
@@ -64,6 +52,7 @@ interface EmailRequest {
   htmlBody?: string;
   textBody?: string;
   trackOpens?: boolean;
+  emailType?: EmailType;
 }
 
 interface InboundEmailRequest {
@@ -79,9 +68,9 @@ const sendEmailHandler: RequestHandler<{}, any, EmailRequest, any> = async (
   req,
   res
 ) => {
-  const { from, to, subject, htmlBody, textBody, trackOpens } = req.body;
+  const { from, to, subject, htmlBody, textBody, trackOpens, emailType } =
+    req.body;
 
-  // Input validation
   if (!to || !subject) {
     res.status(400).json({
       success: false,
@@ -90,7 +79,6 @@ const sendEmailHandler: RequestHandler<{}, any, EmailRequest, any> = async (
     return;
   }
 
-  // Email validation
   if (!validator.isEmail(to)) {
     res
       .status(400)
@@ -98,106 +86,62 @@ const sendEmailHandler: RequestHandler<{}, any, EmailRequest, any> = async (
     return;
   }
 
-  if (from && !validator.isEmail(from)) {
-    res
-      .status(400)
-      .json({ success: false, message: "Invalid sender email address." });
-    return;
-  }
-
-  // Use default sender if none provided
-  const senderEmail = from || "support@ghostplay.store";
+  let senderEmail =
+    from && validator.isEmail(from)
+      ? from
+      : EMAIL_CONFIG.getFromEmail(emailType || "support");
 
   try {
-    const logPrefix = `[${currentMode}]`;
-    console.log(`${logPrefix} Sending email to ${to} with subject: ${subject}`);
+    console.log(`[LIVE] Sending email to ${to} with subject: ${subject}`);
+    console.log(
+      `[LIVE] From: ${senderEmail} (Type: ${emailType || "default"})`
+    );
 
-    let response;
+    const emailPayload = {
+      From: senderEmail,
+      To: to,
+      Subject: subject,
+      HtmlBody: htmlBody,
+      TextBody: textBody,
+      TrackOpens: trackOpens !== false,
+      MessageStream: "outbound",
+      Headers: [
+        { Name: "X-Email-Type", Value: emailType || "general" },
+        { Name: "X-Service", Value: "GhostPlay-Marketplace" },
+      ],
+    };
 
-    if (currentMode === "SIMULATION") {
-      // Full simulation mode - mock the response
-      const mockMessageId = `sim-${Date.now()}-${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
+    const response = await client.sendEmail(emailPayload);
 
-      response = {
-        MessageID: mockMessageId,
-        SubmittedAt: new Date().toISOString(),
-        To: to,
-        ErrorCode: 0,
-        Message: "OK",
-      };
-
-      console.log(`${logPrefix} Email simulated successfully:`, {
-        from: senderEmail,
-        to: to,
-        subject: subject,
-        messageId: mockMessageId,
-      });
-    } else {
-      // TEST or LIVE mode - use actual Postmark
-      const emailPayload = {
-        From: senderEmail,
-        To: to,
-        Subject: currentMode === "TEST" ? `[TEST] ${subject}` : subject,
-        HtmlBody:
-          currentMode === "TEST"
-            ? `<div style="background: #e7f3ff; padding: 10px; margin-bottom: 20px; border: 1px solid #b3d7ff; border-radius: 4px;">
-            <strong>🧪 TEST EMAIL</strong> - This is a test email sent via Postmark's test mode
-          </div>${htmlBody || ""}`
-            : htmlBody,
-        TextBody:
-          currentMode === "TEST"
-            ? `🧪 TEST EMAIL - This is a test email sent via Postmark's test mode\n\n${
-                textBody || ""
-              }`
-            : textBody,
-        TrackOpens: trackOpens !== false,
-        MessageStream: "outbound",
-      };
-
-      response = await client!.sendEmail(emailPayload);
-
-      console.log(`${logPrefix} Email sent successfully:`, {
-        from: senderEmail,
-        to: to,
-        subject: subject,
-        messageId: response.MessageID,
-      });
-    }
-
-    const successMessage =
-      currentMode === "SIMULATION"
-        ? `Email simulated successfully. MessageID: ${response.MessageID}`
-        : `Email sent successfully in ${currentMode} mode. MessageID: ${response.MessageID}`;
-
-    console.log(successMessage);
+    console.log("[LIVE] Email sent successfully:", {
+      from: senderEmail,
+      to,
+      subject,
+      messageId: response.MessageID,
+      emailType: emailType || "default",
+    });
 
     res.json({
       success: true,
       messageId: response.MessageID,
-      to: to,
-      subject: subject,
-      mode: currentMode,
-      testMode: currentMode === "TEST",
-      simulated: currentMode === "SIMULATION",
-      message:
-        currentMode === "SIMULATION"
-          ? "Email simulated successfully"
-          : `Email sent successfully in ${currentMode} mode`,
+      to,
+      from: senderEmail,
+      subject,
+      mode: "LIVE",
+      emailType: emailType || "default",
+      liveMode: true,
+      message: "Email sent successfully in LIVE mode",
     });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    const logPrefix = `[${currentMode} ERROR]`;
-    console.error(`${logPrefix} Email error:`, error);
-
+    console.error("[LIVE ERROR] Email error:", error);
     res.status(500).json({
       success: false,
       message: `Failed to send email: ${errorMessage}`,
-      mode: currentMode,
-      testMode: currentMode === "TEST",
-      simulated: currentMode === "SIMULATION",
+      mode: "LIVE",
+      emailType: emailType || "default",
+      liveMode: true,
     });
   }
 };
@@ -208,17 +152,8 @@ const inboundEmailHandler: RequestHandler<
   InboundEmailRequest,
   any
 > = async (req, res) => {
-  const logPrefix = `[${currentMode}]`;
-  console.log(
-    `${logPrefix} Inbound email received at`,
-    new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" }),
-    ":",
-    JSON.stringify(req.body, null, 2)
-  );
-
   const { From, To, Subject, TextBody, HtmlBody, receivedDate } = req.body;
 
-  // Validate required fields
   if (!From || !Subject) {
     res.status(400).json({
       success: false,
@@ -235,146 +170,140 @@ const inboundEmailHandler: RequestHandler<
         })
       : new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" });
 
-    const ticketData = {
-      from: From,
-      to: "support@ghostplay.store",
-      subject: `Support Reply: ${Subject}`,
-      body: emailBody,
-      receivedAt: receivedAt,
-    };
+    let routingInfo = "General Support";
+    if (To.includes("finance@")) routingInfo = "Finance Department";
+    else if (To.includes("updates@")) routingInfo = "Updates Department";
+    else if (To.includes("noreply@"))
+      routingInfo = "No-Reply (routed to Support)";
 
-    console.log(`${logPrefix} Processing support ticket:`, ticketData);
+    console.log(`[LIVE] Processing inbound email - Routing: ${routingInfo}`);
 
-    let forwardResponse;
+    const forwardResponse = await client.sendEmail({
+      From: EMAIL_CONFIG.supportEmail,
+      To: EMAIL_CONFIG.supportEmail,
+      Subject: `[LIVE] [INBOUND] ${routingInfo}: ${Subject}`,
+      TextBody: `
+INBOUND EMAIL ROUTING INFORMATION
+================================
+Original To: ${To}
+Routing: ${routingInfo}
+From: ${From}
+Received: ${receivedAt}
+Mode: LIVE
+Original Subject: ${Subject}
 
-    if (currentMode === "SIMULATION") {
-      // Simulate the forward response
-      forwardResponse = {
-        MessageID: `sim-inbound-${Date.now()}-${Math.random()
-          .toString(36)
-          .substr(2, 9)}`,
-        SubmittedAt: new Date().toISOString(),
-        To: "support@ghostplay.store",
-        ErrorCode: 0,
-        Message: "OK",
-      };
-
-      console.log(
-        `${logPrefix} Inbound email forwarded (simulated):`,
-        forwardResponse.MessageID
-      );
-    } else {
-      // Forward the inbound email to support using Postmark (TEST or LIVE mode)
-      forwardResponse = await client!.sendEmail({
-        From: "support@ghostplay.store",
-        To: "support@ghostplay.store",
-        Subject: `[${currentMode}] [INBOUND] ${Subject}`,
-        TextBody: `New inbound email from: ${From}\nReceived at: ${receivedAt}\nOriginal Subject: ${Subject}\nMode: ${currentMode}\n\n--- MESSAGE ---\n${emailBody}`,
-        HtmlBody: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            ${
-              currentMode === "TEST"
-                ? '<div style="background: #e7f3ff; padding: 10px; margin-bottom: 20px; border: 1px solid #b3d7ff; border-radius: 4px;"><strong>🧪 TEST EMAIL</strong></div>'
-                : ""
-            }
-            <h2>New Inbound Email</h2>
+--- ORIGINAL MESSAGE ---
+${emailBody}
+      `,
+      HtmlBody: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #28a745; color: white; padding: 10px; margin-bottom: 20px; border-radius: 4px;"><strong>🚀 LIVE EMAIL</strong></div>
+          <h2>📬 Inbound Email - ${routingInfo}</h2>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <p><strong>Original To:</strong> ${To}</p>
             <p><strong>From:</strong> ${From}</p>
             <p><strong>Received:</strong> ${receivedAt}</p>
-            <p><strong>Mode:</strong> ${currentMode}</p>
-            <p><strong>Original Subject:</strong> ${Subject}</p>
-            <hr>
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
-              ${HtmlBody || `<pre>${TextBody || "No content"}</pre>`}
-            </div>
+            <p><strong>Mode:</strong> LIVE</p>
+            <p><strong>Routing:</strong> ${routingInfo}</p>
           </div>
-        `,
-        TrackOpens: true,
-        MessageStream: "outbound",
-      });
-    }
+          <h3>Original Subject: ${Subject}</h3>
+          <hr>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
+            ${
+              HtmlBody ||
+              `<pre style="white-space: pre-wrap;">${
+                TextBody || "No content"
+              }</pre>`
+            }
+          </div>
+        </div>
+      `,
+      TrackOpens: true,
+      MessageStream: "outbound",
+      Headers: [
+        { Name: "X-Email-Type", Value: "inbound-forward" },
+        { Name: "X-Original-To", Value: To },
+        { Name: "X-Routing-Info", Value: routingInfo },
+      ],
+    });
 
-    const successMessage =
-      currentMode === "SIMULATION"
-        ? "Inbound email processed and forwarded to support (simulated)"
-        : `Inbound email processed and forwarded to support (${currentMode} mode)`;
+    console.log(
+      "[LIVE] Inbound email forwarded to support:",
+      forwardResponse.MessageID
+    );
 
     res.status(200).json({
       success: true,
-      message: successMessage,
-      mode: currentMode,
-      testMode: currentMode === "TEST",
-      simulated: currentMode === "SIMULATION",
+      message: "Inbound email processed and forwarded to support (LIVE mode)",
+      mode: "LIVE",
+      routing: routingInfo,
+      originalTo: To,
+      forwardedTo: EMAIL_CONFIG.supportEmail,
+      liveMode: true,
       messageId: forwardResponse.MessageID,
     });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    const logPrefix = `[${currentMode} ERROR]`;
-    console.error(`${logPrefix} Error processing inbound email:`, error);
-
+    console.error("[LIVE ERROR] Error processing inbound email:", error);
     res.status(500).json({
       success: false,
       message: `Failed to process inbound email: ${errorMessage}`,
-      mode: currentMode,
-      testMode: currentMode === "TEST",
-      simulated: currentMode === "SIMULATION",
+      mode: "LIVE",
+      liveMode: true,
     });
   }
 };
 
-// Health check endpoint
-app.get("/api/health", (req: Request, res: Response) => {
+app.get("/api/health", (req, res) => {
   res.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
     timezone: "Africa/Lagos",
-    mode: currentMode,
-    postmarkMode: currentMode,
-    testMode: currentMode === "TEST",
-    simulated: currentMode === "SIMULATION",
-    clientInitialized: currentMode !== "SIMULATION" && client !== null,
-    environmentVars: {
-      POSTMARK_FULL_SIMULATION: process.env.POSTMARK_FULL_SIMULATION,
-      POSTMARK_TEST_MODE: process.env.POSTMARK_TEST_MODE,
-      NODE_ENV: process.env.NODE_ENV,
-      HAS_LIVE_TOKEN: !!POSTMARK_LIVE_TOKEN,
+    mode: "LIVE",
+    liveMode: true,
+    clientInitialized: true,
+    emailConfiguration: {
+      supportEmail: EMAIL_CONFIG.supportEmail,
+      financeEmail: EMAIL_CONFIG.financeEmail,
+      updatesEmail: EMAIL_CONFIG.updatesEmail,
+      noreplyHandledBy: EMAIL_CONFIG.supportEmail,
+      routingActive: true,
+    },
+    environmentVars: { HAS_LIVE_TOKEN: !!POSTMARK_LIVE_TOKEN },
+  });
+});
+
+app.get("/api/email/config", (req, res) => {
+  res.json({
+    mode: "LIVE",
+    emailRouting: {
+      support: EMAIL_CONFIG.supportEmail,
+      finance: EMAIL_CONFIG.financeEmail,
+      updates: EMAIL_CONFIG.updatesEmail,
+      noreply: `${EMAIL_CONFIG.noreplyEmail} (handled by ${EMAIL_CONFIG.supportEmail})`,
+    },
+    routingExamples: {
+      "emailType: 'finance'": EMAIL_CONFIG.getFromEmail("finance"),
+      "emailType: 'updates'": EMAIL_CONFIG.getFromEmail("updates"),
+      "emailType: 'noreply'": EMAIL_CONFIG.getFromEmail("noreply"),
+      "emailType: 'support' or default": EMAIL_CONFIG.getFromEmail("support"),
     },
   });
 });
 
-// Email endpoints
 app.post("/api/email/send", sendEmailHandler);
 app.post("/api/email/inbound-email", inboundEmailHandler);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  const modeIndicator = {
-    SIMULATION: "🧪 SIMULATION MODE",
-    TEST: "🧪 TEST MODE",
-    LIVE: "🚀 LIVE MODE",
-  }[currentMode];
-
-  console.log(
-    `${modeIndicator} Email server running on port ${PORT} at ${new Date().toLocaleString(
-      "en-US",
-      {
-        timeZone: "Africa/Lagos",
-      }
-    )}`
-  );
-  console.log(`📧 Email service active (${currentMode} mode)`);
+  console.log(`🚀 LIVE MODE Email server running on port ${PORT}`);
+  console.log("📧 Email service active (LIVE mode)");
   console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
-
-  if (currentMode === "SIMULATION") {
-    console.log(
-      "💡 All emails will be simulated - no actual sending will occur"
-    );
-  } else if (currentMode === "TEST") {
-    console.log(
-      "🧪 Test mode - real emails will be sent with test headers via Postmark"
-    );
-    console.log("📧 Using Postmark's official test token (POSTMARK_API_TEST)");
-  } else {
-    console.log("⚠️  Live mode - actual emails will be sent via Postmark");
-  }
+  console.log(`⚙️ Email config: http://localhost:${PORT}/api/email/config`);
+  console.log("📬 Email routing configured:");
+  console.log("   • support@ghostplay.store (handles noreply functions)");
+  console.log("   • finance@ghostplay.store (financial transactions)");
+  console.log("   • updates@ghostplay.store (notifications & updates)");
+  console.log("   • Inbound emails automatically routed to support");
 });
